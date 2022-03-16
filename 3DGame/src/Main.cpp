@@ -109,7 +109,7 @@ static void MousePositionCallback(GLFWwindow* window, double xpos, double ypos) 
 
 void MousePositionCallback(GLFWwindow* window, int button, int action, int mods)
 {
-    std::cout << "mouse button pressed" << button << std::endl;
+    std::cout << "mouse button pressed: " << button << std::endl;
 }
 
 int main(void) {
