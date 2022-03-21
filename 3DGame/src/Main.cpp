@@ -20,8 +20,6 @@
 #define WIDTH 800
 #define HEIGHT 600
 
-glm::vec2 mousePos = {0.0f, 0.0f};
-
 
 static const std::string ReadFile(const std::string filename) {
     std::ifstream file(filename);
@@ -106,22 +104,12 @@ void KeyboardCallback(GLFWwindow* window, int key, int scancode, int action, int
 }
 
 static void MousePositionCallback(GLFWwindow* window, double xpos, double ypos) {
-    //std::cout << "mouse moved: (" << xpos << ", " << ypos << ")" << std::endl;
-    mousePos = { xpos, ypos };
+    std::cout << "mouse moved: (" << xpos << ", " << ypos << ")" << std::endl;
 }
 
 void MousePositionCallback(GLFWwindow* window, int button, int action, int mods)
 {
     std::cout << "mouse button pressed: " << button << std::endl;
-}
-
-glm::vec3 GetCameraRay(float xpos, float ypos, glm::mat4 projection, glm::mat4 view) {
-
-    glm::vec4 rayClip = glm::vec4((2.0f * xpos) / WIDTH - 1.0f, 1.0f - (2.0f * ypos) / HEIGHT, -1.0f, 1.0f);
-    glm::vec4 rayEye = glm::inverse(projection) * rayClip;
-    rayEye = glm::vec4(rayEye.x, rayEye.y, -1.0f, 0.0f);
-    glm::vec3 rayWor = glm::normalize(glm::vec3(inverse(view) * rayEye));
-    return rayWor;
 }
 
 int main(void) {
@@ -141,8 +129,10 @@ int main(void) {
 
     glfwSetKeyCallback(window, KeyboardCallback);
     glfwSetCursorPosCallback(window, MousePositionCallback);
-    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+    if (glfwRawMouseMotionSupported())
+        glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
 
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
@@ -158,8 +148,7 @@ int main(void) {
     ImGui_ImplOpenGL3_Init("#version 130");
 
     glm::vec3 bg(0.0f, 0.0f, 0.0f);
-    glm::vec3 cameraPos(16.0, 0.0f, 0.0f);
-
+    glm::vec3 proj(4.0f, 4.0f, 3.0f);
 
 
     float vertices[] = {
@@ -227,7 +216,6 @@ int main(void) {
     float offsets[] = {
         0.0f, 0.0f, 0.0f,
         0.0f, 2.0f, 0.0f,
-        0.0f, 4.0f, 0.0f,
     };
 
     unsigned int indeces[] = {
@@ -252,7 +240,7 @@ int main(void) {
 
     unsigned int vertices_buffer = CreateBuffer(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
     unsigned int color_buffer    = CreateBuffer(GL_ARRAY_BUFFER, sizeof(colors)  , colors  , GL_STATIC_DRAW);
-    unsigned int offset_buffer   = CreateBuffer(GL_ARRAY_BUFFER, sizeof(offsets) , offsets , GL_DYNAMIC_DRAW);
+    unsigned int offset_buffer   = CreateBuffer(GL_ARRAY_BUFFER, sizeof(offsets) , offsets , GL_STATIC_DRAW);
 
     unsigned int indices_buffer = CreateBuffer(GL_ELEMENT_ARRAY_BUFFER, sizeof(indeces), indeces, GL_STATIC_DRAW);
 
@@ -263,14 +251,8 @@ int main(void) {
  
     unsigned int mvp_uniform_location = glGetUniformLocation(shader, "u_MVP");
 
-    double lastFrameTime = glfwGetTime();
     while (!glfwWindowShouldClose(window)) {
 
-        double currentTime = glfwGetTime();
-        double deltaTime = currentTime - lastFrameTime;
-        lastFrameTime = currentTime;
-
-        std::cout << 1 / deltaTime << std::endl;
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -280,23 +262,16 @@ int main(void) {
             ImGui::Begin("colors");
             ImGui::Text((char*)glGetString(GL_VERSION));
             ImGui::ColorEdit3("background", (float*)&bg, ImGuiColorEditFlags_NoInputs);
-            ImGui::SliderFloat3("Proj", (float*)&cameraPos, -25.0f, 25.0f, "%.3f", 0);
+            ImGui::SliderFloat3("Proj", (float*)&proj, -25.0f, 25.0f, "%.3f", 0);
             ImGui::End();
         }
         
-
-
-        // update 
+        // update mvp
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
-        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + glm::vec3(-8.0f, 0, 0.000001f), glm::vec3(0, 1, 0));
+        glm::mat4 view = glm::lookAt(proj, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
         glm::mat4 model = glm::mat4(1.0f);
         glm::mat4 mvp = projection * view * model;
         glUniformMatrix4fv(mvp_uniform_location, 1, GL_FALSE, &mvp[0][0]);
-
-
-        // move object to postion 10 units from camera
-        glm::vec3 objPos = cameraPos + GetCameraRay(mousePos.x, mousePos.y, projection, view) * 10.0f;
-        glBufferSubData(GL_ARRAY_BUFFER, 6 * sizeof(float), 3 * sizeof(float), &objPos);
 
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
